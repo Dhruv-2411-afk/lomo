@@ -56,7 +56,6 @@ export default function Camera() {
     setTimeout(() => setFlash(false), 150)
 
     try {
-      // Capture frame from video
       const canvas = canvasRef.current
       const video = videoRef.current
       canvas.width = video.videoWidth
@@ -75,19 +74,16 @@ export default function Camera() {
       }
       ctx.putImageData(imageData, 0, 0)
 
-      // Convert to blob
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
       const { data: { user } } = await supabase.auth.getUser()
       const filename = `${user.id}/${rollId}/${Date.now()}.jpg`
 
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('photos')
         .upload(filename, blob, { contentType: 'image/jpeg' })
 
       if (uploadError) throw uploadError
 
-      // Insert photo record
       await supabase.from('photos').insert({
         roll_id: rollId,
         user_id: user.id,
@@ -95,14 +91,12 @@ export default function Camera() {
         is_visible: false
       })
 
-      // Increment shots
       const newShotsUsed = roll.shots_used + 1
       await supabase
         .from('rolls')
         .update({ shots_used: newShotsUsed })
         .eq('id', rollId)
 
-      // Start developing if roll is full
       if (newShotsUsed >= roll.shot_limit) {
         await supabase.rpc('start_developing', { p_roll_id: rollId })
         stopCamera()
@@ -122,23 +116,20 @@ export default function Camera() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
-      {/* Flash overlay */}
       {flash && <div className="fixed inset-0 bg-white z-50 pointer-events-none" />}
 
-      {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 bg-black z-10">
         <button onClick={() => { stopCamera(); navigate('/rolls') }}
-          className="text-lomo-muted font-mono text-sm hover:text-white transition-colors">
+          className="text-zinc-500 font-mono text-sm hover:text-white transition-colors">
           ← back
         </button>
-        <p className="font-mono text-lomo-amber font-bold">{roll?.name}</p>
+        <p className="font-mono text-white text-sm">{roll?.name}</p>
         <div className="text-right">
-          <p className="font-mono text-lomo-amber font-bold text-lg">{shotsLeft}</p>
-          <p className="font-mono text-lomo-muted text-xs">left</p>
+          <p className="font-mono text-amber-400 font-bold text-lg">{shotsLeft}</p>
+          <p className="font-mono text-zinc-600 text-xs">left</p>
         </div>
       </div>
 
-      {/* Camera viewfinder */}
       <div className="relative flex-1 overflow-hidden">
         {error ? (
           <div className="flex items-center justify-center h-full">
@@ -154,37 +145,33 @@ export default function Camera() {
               className="w-full h-full object-cover"
               style={{ filter: 'contrast(1.05) saturate(0.9)' }}
             />
-            {/* Viewfinder corners */}
-            <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-lomo-amber opacity-60" />
-            <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-lomo-amber opacity-60" />
-            <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-lomo-amber opacity-60" />
-            <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-lomo-amber opacity-60" />
+            <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white opacity-30" />
+            <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-white opacity-30" />
+            <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white opacity-30" />
+            <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-white opacity-30" />
           </>
         )}
       </div>
 
-      {/* Hidden canvas for capture */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Shot counter film strip */}
       <div className="bg-black px-4 py-2 flex gap-1 justify-center">
         {[...Array(roll?.shot_limit || 24)].map((_, i) => (
           <div key={i}
-            className={`h-2 flex-1 max-w-4 rounded-sm transition-colors ${i < (roll?.shots_used || 0) ? 'bg-lomo-amber' : 'bg-lomo-border'}`}
+            className={`h-1 flex-1 max-w-4 transition-colors ${i < (roll?.shots_used || 0) ? 'bg-amber-400' : 'bg-zinc-800'}`}
           />
         ))}
       </div>
 
-      {/* Shutter button */}
       <div className="bg-black px-4 py-6 flex items-center justify-center">
         <button
           onClick={takePhoto}
           disabled={capturing || shotsLeft === 0 || !!error}
           className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all
-            ${shotsLeft === 0 ? 'border-lomo-muted opacity-30' : 'border-lomo-amber hover:bg-lomo-amber hover:bg-opacity-20 active:scale-95'}
+            ${shotsLeft === 0 ? 'border-zinc-700 opacity-30' : 'border-white hover:border-amber-400 active:scale-95'}
             ${capturing ? 'scale-95' : ''}`}
         >
-          <div className={`w-14 h-14 rounded-full ${capturing ? 'bg-lomo-amber' : 'bg-lomo-border'}`} />
+          <div className={`w-14 h-14 rounded-full ${capturing ? 'bg-white' : 'bg-zinc-700'}`} />
         </button>
       </div>
     </div>
