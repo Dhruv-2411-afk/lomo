@@ -79,12 +79,12 @@ export default function Camera() {
       const filename = `${user.id}/${rollId}/${Date.now()}.jpg`
 
       const { error: uploadError } = await supabase.storage
-        .from('photos')
+        .from('photo')
         .upload(filename, blob, { contentType: 'image/jpeg' })
 
       if (uploadError) throw uploadError
 
-      await supabase.from('photos').insert({
+      await supabase.from('photo').insert({
         roll_id: rollId,
         user_id: user.id,
         storage_path: filename,

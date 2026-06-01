@@ -36,7 +36,7 @@ export default function Roll() {
 
   const fetchPhotos = async () => {
     const { data } = await supabase
-      .from('photos')
+      .from('photo')
       .select('*')
       .eq('roll_id', rollId)
       .eq('is_visible', true)
@@ -46,7 +46,7 @@ export default function Roll() {
       const photosWithUrls = await Promise.all(data.map(async (photo) => {
         if (photo.cloudinary_url) return { ...photo, url: photo.cloudinary_url }
         const { data: urlData } = await supabase.storage
-          .from('photos')
+          .from('photo')
           .createSignedUrl(photo.storage_path, 3600)
         return { ...photo, url: urlData?.signedUrl }
       }))
