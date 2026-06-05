@@ -30,12 +30,9 @@ export default function Shop() {
     setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-
-      // Create order via Supabase Edge Function
       const { data, error: fnError } = await supabase.functions.invoke('create-razorpay-order', {
         body: { rolls, amountPaise, userId: user.id }
       })
-
       if (fnError) throw fnError
 
       const options = {
@@ -46,7 +43,6 @@ export default function Shop() {
         description: `${rolls} roll${rolls > 1 ? 's' : ''} — ${label}`,
         order_id: data.orderId,
         handler: async (response) => {
-          // Verify payment via Edge Function
           const { error: verifyError } = await supabase.functions.invoke('verify-razorpay-payment', {
             body: {
               razorpay_order_id: response.razorpay_order_id,
@@ -61,79 +57,91 @@ export default function Shop() {
           navigate('/rolls')
         },
         prefill: { email: user.email },
-        theme: { color: '#f59e0b' },
+        theme: { color: '#18181b' },
         modal: { ondismiss: () => setLoading(false) }
       }
-
       const rzp = new window.Razorpay(options)
       rzp.open()
     } catch (err) {
       setError('Payment failed. Please try again.')
-      console.error(err)
     }
     setLoading(false)
   }
 
   const plans = [
-    { rolls: 1, amountPaise: 3900, label: '₹39', description: 'One roll · 24 shots' },
-    { rolls: 3, amountPaise: 9900, label: '₹99', description: 'Three rolls · best value', popular: true },
-    { rolls: 6, amountPaise: 17900, label: '₹179', description: 'Six rolls · for the obsessed' },
+    { rolls: 1, amountPaise: 3900, label: '₹39', description: 'Try it out', detail: '1 roll · 24 shots · develops in 24h' },
+    { rolls: 3, amountPaise: 9900, label: '₹99', description: 'Most popular', detail: '3 rolls · 72 shots total', popular: true },
+    { rolls: 6, amountPaise: 17900, label: '₹179', description: 'For the obsessed', detail: '6 rolls · best value per shot' },
   ]
 
   return (
-    <div className="min-h-screen bg-lomo-bg px-4 py-8 max-w-lg mx-auto">
-      {/* Header */}
-      <button onClick={() => navigate('/rolls')}
-        className="text-lomo-muted font-mono text-sm hover:text-white mb-8 block">
-        ← back
-      </button>
+    <div className="min-h-screen bg-white">
+      <nav className="flex items-center justify-between px-6 py-5 border-b border-zinc-100">
+        <span className="font-mono font-bold text-zinc-900 tracking-tight">lomo</span>
+        <button onClick={() => navigate('/rolls')}
+          className="font-mono text-xs text-zinc-400 hover:text-zinc-900 transition-colors">
+          ← back to rolls
+        </button>
+      </nav>
 
-      <h1 className="font-mono font-bold text-lomo-amber text-3xl mb-2">get more rolls</h1>
-      <p className="font-mono text-lomo-muted text-sm mb-2">
-        you have <span className="text-lomo-amber font-bold">{profile?.rolls_remaining ?? 0}</span> rolls remaining
-      </p>
-      <p className="font-mono text-lomo-muted text-xs mb-10">
-        each roll = 24 shots · develops in 24 hours
-      </p>
-
-      {error && (
-        <div className="bg-red-900 border border-red-700 text-red-300 font-mono text-xs p-3 mb-6">
-          {error}
+      <div className="max-w-lg mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="font-mono font-bold text-zinc-900 text-2xl mb-2">get more rolls</h1>
+          <p className="font-mono text-zinc-400 text-sm">
+            you currently have <span className="text-zinc-900 font-bold">{profile?.rolls_remaining ?? 0}</span> rolls remaining
+          </p>
         </div>
-      )}
 
-      {/* Plans */}
-      <div className="space-y-4">
-        {plans.map((plan) => (
-          <div key={plan.rolls}
-            className={`border p-6 relative transition-colors
-              ${plan.popular ? 'border-lomo-amber' : 'border-lomo-border hover:border-lomo-amber'}`}>
-            {plan.popular && (
-              <span className="absolute -top-3 left-4 bg-lomo-amber text-black font-mono text-xs px-2 py-0.5 font-bold uppercase">
-                popular
-              </span>
-            )}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-mono font-bold text-lomo-text text-lg">{plan.rolls} roll{plan.rolls > 1 ? 's' : ''}</p>
-                <p className="font-mono text-lomo-muted text-xs mt-1">{plan.description}</p>
-              </div>
-              <button
-                onClick={() => handlePurchase(plan.rolls, plan.amountPaise, plan.label)}
-                disabled={loading}
-                className="bg-lomo-amber text-black font-mono font-bold px-5 py-2 text-sm hover:bg-yellow-400 transition-colors disabled:opacity-50 uppercase tracking-wider"
-              >
-                {plan.label}
-              </button>
-            </div>
+        {/* What is a roll */}
+        <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-5 mb-8">
+          <p className="font-mono text-xs text-zinc-400 uppercase tracking-widest mb-3">what is a roll?</p>
+          <p className="font-mono text-zinc-600 text-xs leading-relaxed">
+            each roll gives you <span className="text-zinc-900 font-bold">24 shots</span> on a virtual disposable camera. once full, your photos develop over <span className="text-zinc-900 font-bold">24 hours</span> — then you can view and download them. rolls never expire.
+          </p>
+        </div>
+
+        {error && (
+          <div className="border border-red-200 bg-red-50 text-red-600 font-mono text-xs p-3 mb-6 rounded">
+            {error}
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Footer note */}
-      <p className="font-mono text-lomo-muted text-xs text-center mt-10">
-        payments secured by razorpay · rolls never expire
-      </p>
+        {/* Plans */}
+        <div className="space-y-3">
+          {plans.map((plan) => (
+            <div key={plan.rolls}
+              className={`border rounded-xl p-5 relative transition-all
+                ${plan.popular ? 'border-zinc-900' : 'border-zinc-100 hover:border-zinc-300'}`}>
+              {plan.popular && (
+                <span className="absolute -top-3 left-5 bg-zinc-900 text-white font-mono text-xs px-3 py-0.5 rounded-full">
+                  popular
+                </span>
+              )}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-mono font-bold text-zinc-900 text-sm">{plan.description}</p>
+                  <p className="font-mono text-zinc-400 text-xs mt-1">{plan.detail}</p>
+                </div>
+                <button
+                  onClick={() => handlePurchase(plan.rolls, plan.amountPaise, plan.label)}
+                  disabled={loading}
+                  className={`font-mono font-bold text-sm px-5 py-2 transition-colors rounded
+                    ${plan.popular
+                      ? 'bg-zinc-900 text-white hover:bg-zinc-700'
+                      : 'border border-zinc-200 text-zinc-900 hover:border-zinc-900'
+                    } disabled:opacity-40`}>
+                  {plan.label}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="font-mono text-zinc-300 text-xs text-center mt-8">
+          secured by razorpay · rolls never expire · instant credit
+        </p>
+      </div>
     </div>
   )
 }
