@@ -1,0 +1,210 @@
+{
+  "name": "Lomo - Develop Rolls",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://puoybzqvebhdmaaeaexg.supabase.co/rest/v1/rpc/get_rolls_to_develop",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.value }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.value }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "id": "get-rolls",
+      "name": "Get Rolls To Develop",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-rolls",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-if-rolls",
+      "name": "Any Rolls?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://puoybzqvebhdmaaeaexg.supabase.co/rest/v1/rpc/mark_roll_developed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_roll_id: $json.id }) }}",
+        "options": {}
+      },
+      "id": "mark-developed",
+      "name": "Mark Roll Developed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_RESEND_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"lomo <hello@yourdomain.com>\",\n  \"to\": [\"{{ $json.user_email }}\"],\n  \"subject\": \"your roll is ready 🎞\",\n  \"html\": \"<div style='font-family: monospace; max-width: 480px; margin: 0 auto; padding: 40px 20px;'><h1 style='font-size: 24px; font-weight: bold; margin-bottom: 8px;'>your photos are ready.</h1><p style='color: #737373; margin-bottom: 24px;'>{{ $json.roll_name }} has finished developing. tap below to see your photos.</p><a href='https://lomo-omega.vercel.app/roll/{{ $json.id }}' style='display: inline-block; background: #18181b; color: white; padding: 12px 24px; text-decoration: none; font-family: monospace; font-size: 14px;'>view your roll →</a><p style='color: #d4d4d4; font-size: 12px; margin-top: 32px;'>lomo · disposable camera for the web</p></div>\"\n}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send Email via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {},
+      "id": "no-rolls",
+      "name": "No Rolls - Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Rolls To Develop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Rolls To Develop": {
+      "main": [
+        [
+          {
+            "node": "Any Rolls?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Rolls?": {
+      "main": [
+        [
+          {
+            "node": "Mark Roll Developed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Rolls - Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Roll Developed": {
+      "main": [
+        [
+          {
+            "node": "Send Email via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

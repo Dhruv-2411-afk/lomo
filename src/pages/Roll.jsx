@@ -32,6 +32,7 @@ export default function Rolls() {
       .select('*, roll_members!inner(*)')
       .eq('roll_members.user_id', user.id)
       .order('created_at', { ascending: false })
+      console.log('rolls data:', data)
     setRolls(data || [])
     setLoading(false)
   }
