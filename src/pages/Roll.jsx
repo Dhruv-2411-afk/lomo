@@ -66,7 +66,7 @@ export default function Rolls() {
   const shootingRolls = rolls.filter(r => r.status === 'shooting')
   const developingRolls = rolls.filter(r => r.status === 'developing')
   const developedRolls = rolls.filter(r => r.status === 'developed')
-
+  console.log('developed rolls:', developedRolls)
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
