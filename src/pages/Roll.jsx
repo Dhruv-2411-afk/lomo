@@ -173,9 +173,13 @@ export default function Rolls() {
           <div className="mb-8">
             <p className="font-mono text-xs text-zinc-400 uppercase tracking-widest mb-3">ready to view</p>
             <div className="space-y-2">
-              {developedRolls.map(roll => (
-                <div key={roll.id} onClick={() => navigate(`/roll/${roll.id}`)}
-                  className="border border-zinc-100 hover:border-zinc-900 p-4 cursor-pointer transition-colors rounded-lg group">
+            {developedRolls.map(roll => (
+            <div key={roll.id} 
+            onClick={() => {
+            console.log('clicking roll:', roll.id)
+            navigate(`/roll/${roll.id}`)
+              }}
+    className="border border-zinc-100 hover:border-zinc-900 p-4 cursor-pointer transition-colors rounded-lg group">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-mono font-bold text-zinc-900 text-sm">{roll.name}</p>
