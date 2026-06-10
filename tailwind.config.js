@@ -8,17 +8,23 @@ export default {
     extend: {
       colors: {
         lomo: {
-          bg: '#0f0f0f',
-          card: '#1a1a1a',
-          border: '#2a2a2a',
-          amber: '#f59e0b',
-          red: '#ef4444',
-          text: '#e5e5e5',
-          muted: '#737373',
+          bg: '#F7F3EE',
+          secondary: '#EFE8DE',
+          text: '#111111',
+          muted: '#6F6A64',
+          gold: '#E09B2D',
+          brown: '#B76E3A',
+          border: 'rgba(17,17,17,0.08)',
+          success: '#52734D',
         }
       },
       fontFamily: {
-        mono: ['Space Mono', 'monospace'],
+        mono: ['IBM Plex Mono', 'monospace'],
+        serif: ['Playfair Display', 'serif'],
+      },
+      boxShadow: {
+        soft: '0 4px 24px rgba(0,0,0,0.05)',
+        card: '0 12px 40px rgba(0,0,0,0.08)',
       }
     },
   },
