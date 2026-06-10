@@ -1,215 +1,141 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useNavigate } from 'react-router-dom'
 
-export default function Rolls() {
-  const [rolls, setRolls] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [profile, setProfile] = useState(null)
+export default function Roll() {
+  const { rollId } = useParams()
   const navigate = useNavigate()
+  const [roll, setRoll] = useState(null)
+  const [photos, setPhotos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [copying, setCopying] = useState(false)
 
   useEffect(() => {
-    fetchRolls()
-    fetchProfile()
-    const channel = supabase
-      .channel('rolls-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rolls' }, fetchRolls)
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [])
+    fetchRoll()
+    fetchPhotos()
+  }, [rollId])
 
-  const fetchProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    setProfile(data)
+  const fetchRoll = async () => {
+    const { data, error } = await supabase
+      .from('rolls')
+      .select('*')
+      .eq('id', rollId)
+      .single()
+    console.log('roll:', data, error)
+    if (data) setRoll(data)
   }
 
-  const fetchRolls = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase
-      .from('rolls')
-      .select('*, roll_members!inner(*)')
-      .eq('roll_members.user_id', user.id)
-      .order('created_at', { ascending: false })
-      console.log('rolls data:', data)
-    setRolls(data || [])
+  const fetchPhotos = async () => {
+    const { data, error } = await supabase
+      .from('photos')
+      .select('*')
+      .eq('roll_id', rollId)
+      .eq('is_visible', true)
+      .order('taken_at', { ascending: true })
+
+    console.log('photos:', data, error)
+
+    if (data && data.length > 0) {
+      const photosWithUrls = await Promise.all(data.map(async (photo) => {
+        if (photo.cloudinary_url) return { ...photo, url: photo.cloudinary_url }
+        const { data: urlData } = await supabase.storage
+          .from('photo')
+          .createSignedUrl(photo.storage_path, 3600)
+        return { ...photo, url: urlData?.signedUrl }
+      }))
+      setPhotos(photosWithUrls)
+    }
     setLoading(false)
   }
 
-  const createRoll = async () => {
-    if (profile?.rolls_remaining < 1) { navigate('/shop'); return }
-    setCreating(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase
-      .from('rolls')
-      .insert({ owner_id: user.id, name: `Roll #${rolls.length + 1}` })
-      .select().single()
-    await supabase.from('profiles')
-      .update({ rolls_remaining: profile.rolls_remaining - 1 })
-      .eq('id', user.id)
-    setCreating(false)
-    if (data) navigate(`/camera/${data.id}`)
+  const copyInviteLink = async () => {
+    setCopying(true)
+    await navigator.clipboard.writeText(`${window.location.origin}/join/${rollId}`)
+    setTimeout(() => setCopying(false), 2000)
   }
 
   const getCountdown = (develops_at) => {
     if (!develops_at) return null
     const diff = new Date(develops_at) - new Date()
-    if (diff <= 0) return 'ready soon...'
+    if (diff <= 0) return 'developing now...'
     const h = Math.floor(diff / 3600000)
     const m = Math.floor((diff % 3600000) / 60000)
     return `ready in ${h}h ${m}m`
   }
 
-  const handleSignOut = async () => { await supabase.auth.signOut() }
-
-  const shootingRolls = rolls.filter(r => r.status === 'shooting')
-  const developingRolls = rolls.filter(r => r.status === 'developing')
-  const developedRolls = rolls.filter(r => r.status === 'developed')
-  console.log('developed rolls:', developedRolls)
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <nav className="flex items-center justify-between px-6 py-5 border-b border-zinc-100">
-        <span className="font-mono font-bold text-zinc-900 tracking-tight">lomo</span>
-        <div className="flex items-center gap-6">
-          <button onClick={() => navigate('/shop')}
-            className="font-mono text-xs text-zinc-400 hover:text-zinc-900 transition-colors">
-            {profile?.rolls_remaining ?? 0} rolls left
-          </button>
-          <button onClick={handleSignOut}
-            className="font-mono text-xs text-zinc-400 hover:text-zinc-900 transition-colors">
-            sign out
+      <div className="px-6 py-6 border-b border-zinc-100 max-w-2xl mx-auto">
+        <button onClick={() => navigate('/rolls')}
+          className="text-zinc-400 font-mono text-xs hover:text-zinc-900 mb-6 block transition-colors">
+          ← back
+        </button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-mono font-bold text-zinc-900 text-xl">{roll?.name}</h1>
+            <p className="font-mono text-xs text-zinc-400 mt-1">
+              {roll?.shots_used}/{roll?.shot_limit} shots
+            </p>
+          </div>
+          {roll?.is_shared && (
+            <button onClick={copyInviteLink}
+              className="font-mono text-xs border border-zinc-200 px-3 py-2 text-zinc-500 hover:border-zinc-900 hover:text-zinc-900 transition-colors">
+              {copying ? 'copied!' : 'share link'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {roll?.status === 'developing' && (
+        <div className="flex flex-col items-center justify-center py-24 px-4 text-center max-w-sm mx-auto">
+          <p className="font-mono text-zinc-900 font-bold text-2xl mb-3">developing...</p>
+          <p className="font-mono text-zinc-400 text-sm mb-2">
+            {getCountdown(roll.develops_at)}
+          </p>
+          <p className="font-mono text-zinc-300 text-xs mt-4">
+            we'll email you when your photos are ready.
+          </p>
+        </div>
+      )}
+
+      {roll?.status === 'shooting' && (
+        <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+          <p className="font-mono text-zinc-900 font-bold text-2xl mb-3">still shooting</p>
+          <p className="font-mono text-zinc-400 text-sm mb-8">
+            {roll.shot_limit - roll.shots_used} shots remaining
+          </p>
+          <button onClick={() => navigate(`/camera/${rollId}`)}
+            className="border border-zinc-900 text-zinc-900 font-mono text-sm px-6 py-3 hover:bg-zinc-900 hover:text-white transition-colors">
+            continue shooting →
           </button>
         </div>
-      </nav>
+      )}
 
-      <div className="max-w-lg mx-auto px-6 py-10">
-
-        {/* Empty state with explainer */}
-        {!loading && rolls.length === 0 && (
-          <div className="text-center py-12 border border-zinc-100 rounded-xl mb-8 px-6">
-            <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-xl">🎞</span>
-            </div>
-            <h2 className="font-mono font-bold text-zinc-900 mb-2">your darkroom is empty</h2>
-            <p className="font-mono text-zinc-400 text-xs leading-relaxed max-w-xs mx-auto mb-6">
-              create your first roll to start shooting. you get 24 shots — no previews, no deletes. photos reveal after 24 hours.
-            </p>
-            <button onClick={createRoll} disabled={creating}
-              className="bg-zinc-900 text-white font-mono text-xs px-6 py-3 hover:bg-zinc-700 transition-colors">
-              {creating ? 'loading film...' : 'load your first roll →'}
-            </button>
-          </div>
-        )}
-
-        {/* New Roll Button (when rolls exist) */}
-        {rolls.length > 0 && (
-          <button onClick={createRoll} disabled={creating}
-            className="w-full border border-dashed border-zinc-300 hover:border-zinc-900 text-zinc-400 hover:text-zinc-900 font-mono text-xs py-4 mb-8 transition-colors rounded">
-            {creating ? 'loading film...' : '+ load new roll'}
-          </button>
-        )}
-
-        {/* Currently Shooting */}
-        {shootingRolls.length > 0 && (
-          <div className="mb-8">
-            <p className="font-mono text-xs text-zinc-400 uppercase tracking-widest mb-3">currently shooting</p>
-            <div className="space-y-2">
-              {shootingRolls.map(roll => (
-                <div key={roll.id} onClick={() => navigate(`/camera/${roll.id}`)}
-                  className="border border-zinc-100 hover:border-zinc-900 p-4 cursor-pointer transition-colors rounded-lg group">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="font-mono font-bold text-zinc-900 text-sm">{roll.name}</p>
-                      <p className="font-mono text-zinc-400 text-xs mt-0.5">
-                        {roll.shot_limit - roll.shots_used} shots remaining · tap to continue
-                      </p>
-                    </div>
-                    <span className="font-mono text-zinc-900 text-xs group-hover:translate-x-1 transition-transform">→</span>
-                  </div>
-                  <div className="h-1 bg-zinc-100 rounded-full">
-                    <div className="h-1 bg-zinc-900 rounded-full transition-all"
-                      style={{ width: `${(roll.shots_used / roll.shot_limit) * 100}%` }} />
-                  </div>
-                  <p className="font-mono text-zinc-300 text-xs mt-1 text-right">{roll.shots_used}/{roll.shot_limit}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Developing */}
-        {developingRolls.length > 0 && (
-          <div className="mb-8">
-            <p className="font-mono text-xs text-zinc-400 uppercase tracking-widest mb-3">developing</p>
-            <div className="space-y-2">
-              {developingRolls.map(roll => (
-                <div key={roll.id}
-                  className="border border-amber-100 bg-amber-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-mono font-bold text-zinc-900 text-sm">{roll.name}</p>
-                      <p className="font-mono text-amber-600 text-xs mt-0.5">
-                        ⏳ {getCountdown(roll.develops_at)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-zinc-400 text-xs">{roll.shots_used} shots</p>
-                      <p className="font-mono text-zinc-300 text-xs">in the darkroom</p>
-                    </div>
-                  </div>
-                  <p className="font-mono text-zinc-400 text-xs mt-3 border-t border-amber-100 pt-3">
-                    your photos are being developed — we'll email you when they're ready to view
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Developed */}
-        {developedRolls.length > 0 && (
-          <div className="mb-8">
-            <p className="font-mono text-xs text-zinc-400 uppercase tracking-widest mb-3">ready to view</p>
-            <div className="space-y-2">
-            {developedRolls.map(roll => (
-            <div key={roll.id} 
-            onClick={() => {
-            console.log('clicking roll:', roll.id)
-            navigate(`/roll/${roll.id}`)
-              }}
-    className="border border-zinc-100 hover:border-zinc-900 p-4 cursor-pointer transition-colors rounded-lg group">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-mono font-bold text-zinc-900 text-sm">{roll.name}</p>
-                      <p className="font-mono text-green-600 text-xs mt-0.5">✓ developed · tap to view photos</p>
-                    </div>
-                    <span className="font-mono text-zinc-900 text-xs group-hover:translate-x-1 transition-transform">→</span>
+      {roll?.status === 'developed' && (
+        <div className="max-w-2xl mx-auto p-6">
+          {loading ? (
+            <p className="text-zinc-400 font-mono text-center py-12 text-sm">loading photos...</p>
+          ) : photos.length === 0 ? (
+            <p className="text-zinc-400 font-mono text-center py-12 text-sm">no photos found.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-1 mt-4">
+              {photos.map((photo, i) => (
+                <div key={photo.id} className="relative aspect-square bg-zinc-100 overflow-hidden">
+                  <img
+                    src={photo.url}
+                    alt={`Photo ${i + 1}`}
+                    className="w-full h-full object-cover"
+                    style={{ filter: 'contrast(1.05) saturate(0.85)' }}
+                  />
+                  <div className="absolute bottom-1 right-2 font-mono text-white text-xs opacity-40">
+                    {i + 1}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Loading */}
-        {loading && (
-          <p className="font-mono text-zinc-300 text-xs text-center py-12">loading your rolls...</p>
-        )}
-
-        {/* Bottom explainer for new users */}
-        {!loading && rolls.length > 0 && (
-          <div className="border border-zinc-100 rounded-xl p-5 mt-4">
-            <p className="font-mono text-xs text-zinc-400 uppercase tracking-widest mb-3">how it works</p>
-            <div className="space-y-2">
-              <p className="font-mono text-zinc-500 text-xs">🎞 <span className="text-zinc-900">shooting</span> — take photos, counter ticks down</p>
-              <p className="font-mono text-zinc-500 text-xs">⏳ <span className="text-zinc-900">developing</span> — roll is full, photos processing for 24h</p>
-              <p className="font-mono text-zinc-500 text-xs">✓ <span className="text-zinc-900">ready</span> — photos revealed, tap to view your roll</p>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
