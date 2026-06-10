@@ -84,7 +84,7 @@ export default function Camera() {
 
       if (uploadError) throw uploadError
 
-      await supabase.from('photo').insert({
+      await supabase.from('photos').insert({
         roll_id: rollId,
         user_id: user.id,
         storage_path: filename,
