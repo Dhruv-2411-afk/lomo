@@ -52,7 +52,7 @@ export default function Rolls() {
     if (profile?.rolls_remaining < 1) { navigate('/shop'); return }
     setCreating(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const name = rollName.trim() || `Roll #${rolls.length + 1}`
+    const name = rollName.trim() || `Roll #${Date.now().toString().slice(-4)}`
     const { data } = await supabase
       .from('rolls')
       .insert({ owner_id: user.id, name, film_type: selectedFilm })
