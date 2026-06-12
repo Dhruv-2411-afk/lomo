@@ -49,22 +49,29 @@ export default function Rolls() {
   }
 
   const createRoll = async () => {
-    if (profile?.rolls_remaining < 1) { navigate('/shop'); return }
     setCreating(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const name = rollName.trim() || `Roll #${Date.now().toString().slice(-4)}`
-    const { data } = await supabase
-      .from('rolls')
-      .insert({ owner_id: user.id, name, film_type: selectedFilm })
-      .select().single()
-    await supabase.from('profiles')
-      .update({ rolls_remaining: profile.rolls_remaining - 1 })
-      .eq('id', user.id)
+    try {
+      const name = rollName.trim() || `Roll #${Date.now().toString().slice(-4)}`
+      const { data, error } = await supabase.rpc('create_roll', {
+        p_name: name,
+        p_film_type: selectedFilm
+      })
+      if (error) {
+        if (error.message.includes('No rolls remaining')) {
+          navigate('/shop')
+          return
+        }
+        throw error
+      }
+      setShowNewRoll(false)
+      setNewRollStep(1)
+      setRollName('')
+      await fetchProfile()
+      if (data?.id) navigate(`/camera/${data.id}`)
+    } catch (err) {
+      console.error(err)
+    }
     setCreating(false)
-    setShowNewRoll(false)
-    setNewRollStep(1)
-    setRollName('')
-    if (data) navigate(`/camera/${data.id}`)
   }
 
   const getHour = () => {
