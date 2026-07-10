@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 
 const FILM_FILTERS = {
-  kodak_gold: { css: 'contrast(1.1) saturate(1.3) sepia(0.2) brightness(1.05)', grain: 20 },
-  portra: { css: 'contrast(0.95) saturate(0.9) brightness(1.1) hue-rotate(5deg)', grain: 15 },
-  bw: { css: 'grayscale(1) contrast(1.2) brightness(0.95)', grain: 25 },
-  party: { css: 'contrast(1.1) saturate(1.5) brightness(1.05)', grain: 10 },
+  kodak_gold: { css: 'contrast(1.1) saturate(1.3) sepia(0.2) brightness(1.05)', grain: 20, label: 'Kodak Gold' },
+  portra: { css: 'contrast(0.95) saturate(0.9) brightness(1.1) hue-rotate(5deg)', grain: 15, label: 'Portra' },
+  bw: { css: 'grayscale(1) contrast(1.2) brightness(0.95)', grain: 25, label: 'B&W' },
+  party: { css: 'contrast(1.1) saturate(1.5) brightness(1.05)', grain: 10, label: 'Party' },
 }
+
+const FILM_ORDER = ['kodak_gold', 'portra', 'bw', 'party']
 
 export default function Camera() {
   const { rollId } = useParams()
@@ -23,6 +25,7 @@ export default function Camera() {
   const [message, setMessage] = useState(null)
   const [facingMode, setFacingMode] = useState('environment')
   const [permissionDenied, setPermissionDenied] = useState(false)
+  const [selectedFilter, setSelectedFilter] = useState('kodak_gold')
 
   useEffect(() => {
     fetchRoll()
@@ -37,6 +40,8 @@ export default function Camera() {
     const { data } = await supabase.from('rolls').select('*').eq('id', rollId).single()
     if (!data || data.status !== 'shooting') { navigate('/rolls'); return }
     setRoll(data)
+    // Default the per-shot filter to the roll's film type, but this can be changed per photo
+    setSelectedFilter(data.film_type || 'kodak_gold')
   }
 
   const startCamera = async () => {
@@ -125,7 +130,7 @@ export default function Camera() {
       canvas.height = video.videoHeight || 720
       const ctx = canvas.getContext('2d')
       ctx.drawImage(video, 0, 0)
-      applyFilmFilter(ctx, canvas, roll.film_type || 'kodak_gold')
+      applyFilmFilter(ctx, canvas, selectedFilter)
 
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
       const { data: { user } } = await supabase.auth.getUser()
@@ -138,7 +143,7 @@ export default function Camera() {
       const { error: insertError } = await supabase.from('photos').insert({
         roll_id: rollId, user_id: user.id,
         storage_path: filename, is_visible: false,
-        filter_applied: roll.film_type || 'kodak_gold'
+        filter_applied: selectedFilter
       })
       if (insertError) throw insertError
 
@@ -165,7 +170,7 @@ export default function Camera() {
     setCapturing(false)
   }
 
-  const filmFilter = FILM_FILTERS[roll?.film_type] || FILM_FILTERS.kodak_gold
+  const filmFilter = FILM_FILTERS[selectedFilter] || FILM_FILTERS.kodak_gold
   const shotsLeft = roll ? roll.shot_limit - roll.shots_used : 0
 
   return (
@@ -182,7 +187,7 @@ export default function Camera() {
           className="text-zinc-500 font-mono text-sm hover:text-white transition-colors">← back</button>
         <div className="text-center">
           <p className="font-mono text-white text-sm">{roll?.name}</p>
-          <p className="font-mono text-zinc-600 text-xs">{roll?.film_type?.replace('_', ' ') || 'kodak gold'}</p>
+          <p className="font-mono text-zinc-600 text-xs">{filmFilter.label}</p>
         </div>
         <div className="text-right">
           <p className="font-mono text-lomo-gold font-bold text-lg">{shotsLeft}</p>
@@ -235,11 +240,28 @@ export default function Camera() {
 
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Film strip */}
+      {/* Film strip (shots progress) */}
       <div className="bg-black px-4 py-2 flex gap-0.5 justify-center">
         {[...Array(roll?.shot_limit || 24)].map((_, i) => (
           <div key={i}
             className={`h-1 flex-1 max-w-4 rounded-sm transition-colors ${i < (roll?.shots_used || 0) ? 'bg-lomo-gold' : 'bg-zinc-800'}`} />
+        ))}
+      </div>
+
+      {/* Per-photo filter picker */}
+      <div className="bg-black px-4 pt-1 pb-3 flex gap-2 justify-center">
+        {FILM_ORDER.map((key) => (
+          <button
+            key={key}
+            onClick={() => setSelectedFilter(key)}
+            disabled={capturing}
+            className={`font-mono text-xs px-3 py-1.5 rounded-full border transition-colors
+              ${selectedFilter === key
+                ? 'border-lomo-gold text-lomo-gold bg-lomo-gold/10'
+                : 'border-zinc-700 text-zinc-500 hover:text-white hover:border-zinc-500'}`}
+          >
+            {FILM_FILTERS[key].label}
+          </button>
         ))}
       </div>
 
